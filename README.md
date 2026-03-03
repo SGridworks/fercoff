@@ -2,7 +2,7 @@
 
 ## Secure AI Sandbox for Grid Engineers
 
-**Because your data deserves to be used and abused"**
+**Because your data deserves to be used and abused**
 
 ---
 
