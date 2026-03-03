@@ -1,5 +1,11 @@
 # Hardware Bill of Materials — FERCoff Pilot Deployment
 
+## ⚠️ Disclaimer
+
+**This is a shopping list, not a guarantee.** Buying these components does not make you compliant. Proper deployment, configuration, documentation, and audit preparation are your responsibility. See [DISCLAIMER.md](../DISCLAIMER.md) for complete terms.
+
+---
+
 ## Core Components (Required)
 
 | Item | Qty | Unit Cost | Total | SKU / Link | Notes |

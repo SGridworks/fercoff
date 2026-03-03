@@ -148,6 +148,20 @@ Commercial use encouraged. Attribution appreciated.
 
 ---
 
+## ⚠️ Important Disclaimers
+
+**Not Legal Advice:** FERCoff is a technical reference architecture, not legal advice. We are engineers, not lawyers. Consult your general counsel and compliance team before deploying any system that handles CEII or CIP-protected data.
+
+**Not a Certified Solution:** FERCoff is not NERC-certified, FERC-approved, or officially sanctioned by any regulatory body. It is a well-documented DIY implementation using consumer hardware and open-source software. Your mileage may vary.
+
+**Audit at Your Own Risk:** What works for one utility's audit culture may not work for another. Know your auditors. Document your decisions. Get sign-off from your CISO before going to production.
+
+**No Warranty:** This software and documentation are provided "as is" without warranty of any kind. See [LICENSE-code](LICENSE-code) and [LICENSE-docs](LICENSE-docs) for full terms.
+
+**Security is Your Responsibility:** We disclose known vulnerabilities (like ClawJacked) and mitigation steps, but you are responsible for keeping your deployment patched, monitored, and secure.
+
+---
+
 ## About SGRIDWORKS
 
 FERCoff was developed by [SGRIDWORKS](https://sgridworks.ai), the open-source ML/AI playground for power systems engineers.
