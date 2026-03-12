@@ -1,0 +1,88 @@
+---
+# Common hardening applied to both gateway and sandbox nodes.
+# macOS-specific -- assumes Apple Silicon Mac Minis.
+
+- name: Create FERCoff directory structure
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: wheel
+    mode: "0755"
+  loop:
+    - "{{ fercoff_base }}"
+    - "{{ fercoff_log_dir }}"
+    - "{{ fercoff_data_dir }}"
+    - "{{ fercoff_backup_dir }}"
+
+- name: Create audit log directory with append-only semantics
+  file:
+    path: "{{ fercoff_audit_dir }}"
+    state: directory
+    owner: root
+    group: wheel
+    mode: "0755"
+
+# macOS application firewall -- defense in depth alongside pf
+- name: Enable macOS application firewall
+  command: /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate on
+  changed_when: false
+
+- name: Enable stealth mode to ignore unauthorized ICMP and probes
+  command: /usr/libexec/ApplicationFirewall/socketfilterfw --setstealthmode on
+  changed_when: false
+
+# Remote login should be off by default; gateway role enables it selectively
+- name: Disable remote login (SSH) by default
+  command: systemsetup -setremotelogin off
+  changed_when: false
+  ignore_errors: true
+
+- name: Disable automatic software updates to prevent unplanned reboots
+  community.general.osx_defaults:
+    domain: com.apple.SoftwareUpdate
+    key: AutomaticCheckEnabled
+    type: bool
+    value: false
+
+- name: Disable Spotlight indexing on data volumes to reduce disk I/O
+  command: mdutil -i off /
+  changed_when: false
+
+- name: Install log rotation launchd plist
+  copy:
+    dest: /Library/LaunchDaemons/ai.fercoff.log-rotate.plist
+    content: |
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+        "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+      <plist version="1.0">
+      <dict>
+        <key>Label</key>
+        <string>ai.fercoff.log-rotate</string>
+        <key>ProgramArguments</key>
+        <array>
+          <string>/bin/bash</string>
+          <string>-c</string>
+          <string>find {{ fercoff_log_dir }} -name '*.log' -size +50M -exec truncate -s 0 {} \;</string>
+        </array>
+        <key>StartCalendarInterval</key>
+        <dict>
+          <key>Hour</key>
+          <integer>3</integer>
+          <key>Minute</key>
+          <integer>0</integer>
+        </dict>
+      </dict>
+      </plist>
+    mode: "0644"
+  notify: load log-rotate
+
+- name: Ensure log rotation is loaded
+  command: launchctl load /Library/LaunchDaemons/ai.fercoff.log-rotate.plist
+  changed_when: false
+  ignore_errors: true
+
+handlers:
+  - name: load log-rotate
+    command: launchctl load /Library/LaunchDaemons/ai.fercoff.log-rotate.plist

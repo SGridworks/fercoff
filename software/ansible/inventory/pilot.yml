@@ -1,0 +1,23 @@
+---
+# FERCoff pilot deployment inventory
+# Adjust ansible_host values to match your network.
+# Mini B should only be reachable via Thunderbolt from Mini A.
+
+all:
+  children:
+    gateway:
+      hosts:
+        mini-a:
+          ansible_host: 192.168.1.100  # your LAN IP for Mini A
+          ansible_user: fercoff-admin
+          ansible_become: true
+          node_role: gateway
+
+    sandbox:
+      hosts:
+        mini-b:
+          ansible_host: 10.0.5.2  # Thunderbolt direct link
+          ansible_user: fercoff-admin
+          ansible_become: true
+          ansible_ssh_common_args: '-o ProxyJump=mini-a'
+          node_role: sandbox

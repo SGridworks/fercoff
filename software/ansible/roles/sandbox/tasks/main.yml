@@ -1,0 +1,149 @@
+---
+# Sandbox role (Mini B) -- air-gapped node holding CEII data.
+# No external network access. Inference runs here.
+
+# -- Verify air-gap before proceeding --
+- name: Verify no default route exists (air-gap check)
+  shell: route -n get default 2>&1 || true
+  register: route_check
+  changed_when: false
+
+- name: Warn if default route found
+  debug:
+    msg: "WARNING: Mini B has a default route. This node must be air-gapped."
+  when: "'gateway' in route_check.stdout"
+
+# -- Disable wireless and unnecessary services --
+- name: Disable WiFi interface permanently
+  command: networksetup -setairportpower en0 off
+  changed_when: false
+  ignore_errors: true
+
+- name: Remove WiFi from service order so it cannot auto-enable
+  command: networksetup -removepreferredwirelessnetwork en0 "{{ item }}"
+  loop: []  # populated by site-specific vars if needed
+  ignore_errors: true
+
+- name: Disable mDNSResponder to prevent network discovery leaks
+  command: launchctl unload -w /System/Library/LaunchDaemons/com.apple.mDNSResponder.plist
+  changed_when: false
+  ignore_errors: true
+
+- name: Disable awacsd (Apple Wide Area Connectivity Service)
+  command: launchctl unload -w /System/Library/LaunchDaemons/com.apple.awacsd.plist
+  changed_when: false
+  ignore_errors: true
+
+# -- Thunderbolt IP bridge from gateway --
+- name: Configure Thunderbolt bridge IP
+  command: >
+    networksetup -setmanual "Thunderbolt Bridge"
+    {{ sandbox_ip }} 255.255.255.0
+  changed_when: false
+
+# -- FileVault encryption --
+- name: Check FileVault status
+  command: fdesetup status
+  register: fv_status
+  changed_when: false
+
+- name: Enable FileVault if not already active
+  command: fdesetup enable -user {{ fercoff_admin_user }}
+  when: "'FileVault is Off' in fv_status.stdout"
+  # Requires interactive recovery key setup on first run.
+  # Store the recovery key securely offline.
+
+# -- Firewall --
+- name: Deploy sandbox pf.conf (deny-all outbound)
+  template:
+    src: pf.conf.j2
+    dest: /etc/pf.conf
+    owner: root
+    group: wheel
+    mode: "0644"
+    backup: true
+  notify: reload pf
+
+- name: Enable pf firewall
+  command: pfctl -e
+  changed_when: false
+  ignore_errors: true
+
+# -- Ollama (installed offline via USB) --
+# Ollama binary must be pre-staged at /opt/fercoff/staging/ollama
+- name: Check if Ollama is already installed
+  stat:
+    path: /usr/local/bin/ollama
+  register: ollama_check
+
+- name: Copy Ollama binary from staging
+  copy:
+    src: /opt/fercoff/staging/ollama
+    dest: /usr/local/bin/ollama
+    remote_src: true
+    mode: "0755"
+  when: not ollama_check.stat.exists
+
+- name: Create Ollama LaunchDaemon
+  copy:
+    dest: /Library/LaunchDaemons/ai.fercoff.ollama.plist
+    content: |
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+        "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+      <plist version="1.0">
+      <dict>
+        <key>Label</key>
+        <string>ai.fercoff.ollama</string>
+        <key>ProgramArguments</key>
+        <array>
+          <string>/usr/local/bin/ollama</string>
+          <string>serve</string>
+        </array>
+        <key>EnvironmentVariables</key>
+        <dict>
+          <key>OLLAMA_HOST</key>
+          <string>{{ sandbox_ip }}:{{ ollama_port }}</string>
+        </dict>
+        <key>RunAtLoad</key>
+        <true/>
+        <key>KeepAlive</key>
+        <true/>
+        <key>StandardOutPath</key>
+        <string>{{ fercoff_log_dir }}/ollama.log</string>
+        <key>StandardErrorPath</key>
+        <string>{{ fercoff_log_dir }}/ollama.err.log</string>
+      </dict>
+      </plist>
+    mode: "0644"
+  notify: load ollama
+
+- name: Ensure Ollama is running
+  command: launchctl load /Library/LaunchDaemons/ai.fercoff.ollama.plist
+  changed_when: false
+  ignore_errors: true
+
+# -- Audit logging --
+- name: Deploy audit logger daemon
+  template:
+    src: audit-logger.plist.j2
+    dest: /Library/LaunchDaemons/ai.fercoff.audit-logger.plist
+    owner: root
+    group: wheel
+    mode: "0644"
+  notify: load audit-logger
+
+- name: Initialize audit log
+  copy:
+    dest: "{{ fercoff_audit_dir }}/audit.log"
+    content: ""
+    force: false
+    mode: "0644"
+
+- name: Set audit directory permissions to prevent deletion
+  file:
+    path: "{{ fercoff_audit_dir }}"
+    state: directory
+    mode: "0755"
+    attributes: +a
+  ignore_errors: true

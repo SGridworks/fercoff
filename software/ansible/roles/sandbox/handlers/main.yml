@@ -1,0 +1,9 @@
+---
+- name: reload pf
+  command: pfctl -f /etc/pf.conf
+
+- name: load ollama
+  command: launchctl load /Library/LaunchDaemons/ai.fercoff.ollama.plist
+
+- name: load audit-logger
+  command: launchctl load /Library/LaunchDaemons/ai.fercoff.audit-logger.plist

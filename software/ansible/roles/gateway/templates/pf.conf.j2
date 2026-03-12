@@ -1,0 +1,32 @@
+# FERCoff Gateway (Mini A) -- pf firewall rules
+# Allows outbound internet for Tailscale and package management.
+# Restricts direct access to sandbox to Ollama port only.
+
+set skip on lo0
+
+# Scrub incoming packets
+scrub in all
+
+# Default: block everything, log blocked packets
+block log all
+
+# Allow all outbound traffic (gateway has internet access)
+pass out all keep state
+
+# Allow inbound SSH from Tailscale interface
+pass in on tailscale0 proto tcp to port 22 keep state
+
+# Allow inbound on Tailscale for gateway API (FastAPI on 8000)
+pass in on tailscale0 proto tcp to port 8000 keep state
+
+# Thunderbolt bridge to sandbox -- only allow Ollama traffic
+pass out on bridge0 proto tcp to {{ sandbox_ip }} port {{ ollama_port }} keep state
+
+# Allow SSH to sandbox over Thunderbolt for Ansible provisioning
+pass out on bridge0 proto tcp to {{ sandbox_ip }} port 22 keep state
+
+# Block everything else to sandbox
+block out on bridge0 all
+
+# Allow ICMP for diagnostics (Thunderbolt link only)
+pass on bridge0 inet proto icmp icmp-type { echoreq, echorep }

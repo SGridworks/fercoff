@@ -1,0 +1,29 @@
+---
+# FERCoff deployment playbook
+# Provisions both gateway (Mini A) and sandbox (Mini B) from scratch.
+#
+# Usage:
+#   ansible-playbook -i inventory/pilot.yml deploy.yml
+#   ansible-playbook -i inventory/pilot.yml deploy.yml --tags gateway
+#   ansible-playbook -i inventory/pilot.yml deploy.yml --tags sandbox
+
+- name: Apply common hardening to all nodes
+  hosts: all
+  become: true
+  roles:
+    - common
+  tags: [common]
+
+- name: Configure Mini A as gateway
+  hosts: gateway
+  become: true
+  roles:
+    - gateway
+  tags: [gateway]
+
+- name: Configure Mini B as air-gapped sandbox
+  hosts: sandbox
+  become: true
+  roles:
+    - sandbox
+  tags: [sandbox]

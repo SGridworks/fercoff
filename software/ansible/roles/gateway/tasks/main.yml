@@ -1,0 +1,85 @@
+---
+# Gateway role (Mini A) -- internet-connected node where engineers connect.
+# Handles job orchestration, Tailscale VPN, and non-CEII inference.
+
+- name: Enable remote login for engineer SSH access
+  command: systemsetup -setremotelogin on
+  changed_when: false
+
+# -- Homebrew (idempotent, skips if present) --
+- name: Check if Homebrew is installed
+  stat:
+    path: /opt/homebrew/bin/brew
+  register: brew_check
+
+- name: Install Homebrew
+  shell: |
+    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  when: not brew_check.stat.exists
+  become_user: "{{ fercoff_admin_user }}"
+
+# -- Core dependencies --
+- name: Install gateway packages via Homebrew
+  community.general.homebrew:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - node@22
+    - tailscale
+    - ollama
+  become_user: "{{ fercoff_admin_user }}"
+
+# -- Tailscale --
+- name: Start Tailscale daemon
+  command: brew services start tailscale
+  become_user: "{{ fercoff_admin_user }}"
+  changed_when: false
+
+- name: Authenticate Tailscale (requires auth key in env)
+  command: tailscale up --authkey={{ tailscale_auth_key }}
+  when: tailscale_auth_key | length > 0
+  changed_when: false
+
+# -- Ollama --
+- name: Start Ollama service
+  command: brew services start ollama
+  become_user: "{{ fercoff_admin_user }}"
+  changed_when: false
+
+- name: Pull Qwen models for non-CEII tasks
+  command: ollama pull {{ item }}
+  loop: "{{ ollama_models }}"
+  changed_when: false
+  # Only pull the smaller model on gateway; 7B stays on sandbox
+  when: item == "qwen2.5:3b"
+
+# -- Thunderbolt IP bridge to sandbox --
+- name: Configure Thunderbolt bridge IP
+  command: >
+    networksetup -setmanual "Thunderbolt Bridge"
+    {{ gateway_ip }} 255.255.255.0
+  changed_when: false
+
+# -- Firewall --
+- name: Deploy gateway pf.conf
+  template:
+    src: pf.conf.j2
+    dest: /etc/pf.conf
+    owner: root
+    group: wheel
+    mode: "0644"
+    backup: true
+  notify: reload pf
+
+- name: Enable pf firewall
+  command: pfctl -e
+  changed_when: false
+  ignore_errors: true
+
+# -- OpenClaw gateway (optional, for sgridworks integration) --
+- name: Install OpenClaw globally
+  community.general.npm:
+    name: openclaw
+    global: true
+  become_user: "{{ fercoff_admin_user }}"
+  ignore_errors: true

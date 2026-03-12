@@ -1,0 +1,33 @@
+---
+# FERCoff shared variables
+# These define the baseline configuration for both gateway and sandbox nodes.
+
+# -- Network --
+thunderbolt_subnet: "10.0.5.0/24"
+gateway_ip: "10.0.5.1"
+sandbox_ip: "10.0.5.2"
+
+# -- Ollama --
+ollama_port: 11434
+ollama_models:
+  - qwen2.5:3b
+  - qwen2.5:7b
+
+# -- Paths --
+fercoff_base: /opt/fercoff
+fercoff_log_dir: /var/log/fercoff
+fercoff_data_dir: /opt/fercoff/data
+fercoff_audit_dir: /var/log/fercoff/audit
+fercoff_backup_dir: /opt/fercoff/backups
+
+# -- Users --
+fercoff_admin_user: fercoff-admin
+engineer_group: fercoff-engineers
+
+# -- Security --
+filevault_enabled: true
+pf_enabled: true
+audit_retention_days: 365
+
+# -- Tailscale (gateway only) --
+tailscale_auth_key: "{{ lookup('env', 'TAILSCALE_AUTH_KEY') }}"

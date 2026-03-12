@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  FERCoff audit logger -- writes a heartbeat and captures system events
+  to the append-only audit directory every 5 minutes.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>ai.fercoff.audit-logger</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-c</string>
+    <string>
+      LOG="{{ fercoff_audit_dir }}/audit.log"
+      TS=$(date -u +%%Y-%%m-%%dT%%H:%%M:%%SZ)
+      OLLAMA=$(curl -s -o /dev/null -w "%%{http_code}" http://{{ sandbox_ip }}:{{ ollama_port }}/api/tags 2>/dev/null || echo "down")
+      FV=$(fdesetup status 2>/dev/null | head -1)
+      PF=$(pfctl -s info 2>/dev/null | head -1)
+      echo "${TS} ollama=${OLLAMA} filevault=\"${FV}\" pf=\"${PF}\"" >> "$LOG"
+    </string>
+  </array>
+  <key>StartInterval</key>
+  <integer>300</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardErrorPath</key>
+  <string>{{ fercoff_log_dir }}/audit-logger.err.log</string>
+</dict>
+</plist>

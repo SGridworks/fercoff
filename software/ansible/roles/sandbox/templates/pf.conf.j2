@@ -1,0 +1,27 @@
+# FERCoff Sandbox (Mini B) -- pf firewall rules
+# DENY ALL outbound. This node is air-gapped.
+# Only accepts inbound from gateway over Thunderbolt.
+
+set skip on lo0
+
+# Scrub incoming packets
+scrub in all
+
+# Default: block everything
+block log all
+
+# Block ALL outbound -- this is the air-gap enforcement
+block out all
+
+# Allow inbound Ollama requests from gateway only (Thunderbolt bridge)
+pass in on bridge0 proto tcp from {{ gateway_ip }} to {{ sandbox_ip }} port {{ ollama_port }} keep state
+
+# Allow inbound SSH from gateway only (for Ansible and maintenance)
+pass in on bridge0 proto tcp from {{ gateway_ip }} to {{ sandbox_ip }} port 22 keep state
+
+# Allow ICMP from gateway only (health checks)
+pass in on bridge0 inet proto icmp from {{ gateway_ip }} icmp-type echoreq
+
+# Explicitly deny any WiFi/Ethernet that might get enabled accidentally
+block on en0 all
+block on en1 all
